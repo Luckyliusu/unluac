@@ -27,6 +27,9 @@ public class BHeader {
   
   public final boolean debug = false;
   
+  // 输入文件是否为 xLua 定制 dump (由 XluaHeaderFixer 检测设置)
+  public final boolean xlua;
+  
   public final Configuration config;
   public final Version version;
   public final LHeader lheader;
@@ -56,6 +59,7 @@ public class BHeader {
   
   public BHeader(Version version, LHeader lheader, TypeMap typemap, LFunction main) {
     this.config = null;
+    this.xlua = false;
     this.version = version;
     this.lheader = lheader;
     this.lheader_type = version.getLHeaderType();
@@ -79,6 +83,10 @@ public class BHeader {
   }
   
   public BHeader(ByteBuffer buffer, Configuration config) {
+    this(buffer, config, unluac.parse.XluaHeaderFixer.wasXlua());
+  }
+  
+  public BHeader(ByteBuffer buffer, Configuration config, boolean isXlua) {
     this.config = config;
     // 4 byte Lua signature
     for(int i = 0; i < signature.length; i++) {
@@ -95,6 +103,8 @@ public class BHeader {
     if(version == null) {
       throw new IllegalStateException("The input chunk's Lua version is " + major + "." + minor + "; unluac can only handle Lua 5.0 - Lua 5.4.");
     }
+    
+    xlua = isXlua;
     
     lheader_type = version.getLHeaderType();
     lheader = lheader_type.parse(buffer, this);
@@ -166,6 +176,29 @@ public class BHeader {
           }
         }
         opmap = new OpcodeMap(useropmap);
+      } else if(xlua) {
+        // xLua (Tencent, Unity) 打乱的 opcode 自动映射 (据 luaV_execute sub_180030640 逆向)
+        Map<Integer, Op> xluaopmap = new HashMap<Integer, Op>();
+        String[] ops = {
+          "move", "call", "tailcall", "return",
+          "forloop", "forprep", "tforcall", "tforloop",
+          "loadk", "loadkx", "loadbool", "loadnil",
+          "getupval", "gettabup", "gettable", "settabup",
+          "setupval", "settable", "newtable", "self",
+          "add", "sub", "mul", "mod", "pow",
+          "div", "idiv", "band", "bor", "bxor",
+          "shl", "shr", "unm", "bnot", "not",
+          "len", "concat", "jmp", "eq", "lt",
+          "le", "test", "testset", "setlist",
+          "closure", "vararg"
+        };
+        for(int i = 0; i < ops.length; i++) {
+          Op op = version.getOpcodeMap().get(ops[i]);
+          if(op != null) {
+            xluaopmap.put(i, op);
+          }
+        }
+        opmap = new OpcodeMap(xluaopmap);
       } else {
         opmap = version.getOpcodeMap();
       }

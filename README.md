@@ -291,3 +291,30 @@ java -jar unluac.jar --opmap opcodes.txt custom.luac > output.lua
 ```
 
 **Note**: This tool is intended for legitimate purposes such as debugging, learning, and analyzing Lua code. Please respect intellectual property rights and use responsibly.
+
+## xLua Auto-Support (This Fork's Extra Feature)
+
+This fork adds **zero-configuration decompilation of xLua (Tencent, Unity) bytecode**:
+
+- **Auto header fix**: xLua dumps use a non-standard chunk header (no `sizeof(size_t)` field, `format=1`). Detected and converted automatically — no manual hex editing needed.
+- **Auto opcode map**: xLua shuffles the Lua 5.3 opcode table. The de-obfuscated mapping (recovered by reversing `xlua.dll`'s `luaV_execute`) is built in and applied automatically.
+- **Auto-detected variants**: works with raw game dumps, hex-edited files, and standard Lua 5.0–5.4 bytecode — the correct path is chosen per file automatically.
+
+### Usage
+
+```bash
+# No flags needed — xLua dumps just work:
+java -jar unluac.jar "path/to/game_dump.lua"
+
+# Standard Lua 5.0-5.4 bytecode continues to work as before,
+# and --opmap / --typemap overrides are still honored.
+```
+
+### How the opcode mapping was recovered
+
+The mapping was extracted by disassembling `xlua.dll` (x64) with IDA Pro:
+
+- `luaV_execute` located via function size + callgraph analysis
+- Each `switch (insn & 0x3F)` case matched against standard Lua 5.3 semantics
+  (arith TM event codes, `luaV_concat`/`luaV_objlen` helpers, `luaH_*` table ops)
+- Result: 46-opcode permutation table, verified end-to-end against 500+ real game dump files

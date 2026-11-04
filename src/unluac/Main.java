@@ -183,7 +183,11 @@ public class Main {
       FileChannel in = file.getChannel();
       while(len > 0) len -= in.read(buffer);
       buffer.rewind();
-      BHeader header = new BHeader(buffer, config);
+      // xLua 定制 dump 头自动检测与转换 (Tencent xLua / Unity)
+      // 先探查是否 xlua (fmt=1 等), 转换后再交给 BHeader
+      boolean[] xluaFlag = new boolean[1];
+      buffer = unluac.parse.XluaHeaderFixer.fix(buffer, xluaFlag);
+      BHeader header = new BHeader(buffer, config, xluaFlag[0]);
       return header.main;
     } finally {
       if(file != null) {

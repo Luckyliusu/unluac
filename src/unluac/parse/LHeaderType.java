@@ -94,9 +94,10 @@ abstract public class LHeaderType extends BObjectType<LHeader> {
   protected void parse_format(ByteBuffer buffer, BHeader header, LHeaderParseState s) {
     // 1 byte Lua "format"
     int format = 0xFF & buffer.get();
-    if(format != 0) {
+    if(format != 0 && format != 1) {
       throw new IllegalStateException("The input chunk reports a non-standard lua format: " + format);
     }
+    if(format == 1) format = 0; // xLua 定制 dump 使用 format=1, 视同 0
     s.format = format;
     if(header.debug) {
       System.out.println("-- format: " + format);
